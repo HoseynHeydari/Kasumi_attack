@@ -8,9 +8,10 @@
 using namespace std;
 
 int main(void){
-    u32 sample_size = pow(2,24);
+    u32 sample_size = (u32)(pow(2, 24));
     u32 arbitraary = 0x6a6f6e61;
-    u16 keyb[8], keya[8] = {
+    u16 keyb[8];
+    u16 keya[8] = {
             0x9900, 0xAABB, 0xCCDD, 0xEEFF, 0x1122, 0x3344, 0x5566, 0x7788
     };
     unordered_map<u16,u32[4]> pairs;
@@ -29,7 +30,7 @@ int main(void){
         pb[0] = cb[0];
         pb[1] = cb[1];
         Kasumi(cb);
-//        pairs.insert(0xFF, {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF});
+        pairs.insert(cb[1] ^ 0xFF,{ca[0],ca[1],cb[0],cb[1]});
     }
     return 0;
 }
