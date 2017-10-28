@@ -231,28 +231,3 @@ void KeySchedule(u16 *key )
         KIi3[n] = Kprime[(n+7)&0x7];
     }
 }
-int main(void){
-    int i;
-    u32 left, right, temp;
-    u16 key[8] = {
-            0x9900, 0xAABB, 0xCCDD, 0xEEFF, 0x1122, 0x3344, 0x5566, 0x7788
-    };
-
-    u32 text[2]  = {
-            //0x12, 0x34, 0x56, 0x78, 0x90, 0xAB, 0xCD, 0xEF,
-            //0xFE, 0xDC, 0xBA, 0x09, 0x87, 0x65, 0x43, 0x21,
-//            0xFEDCBA09, 0x87654321,
-            0x51489622, 0x6caa4f20
-            //0x6a6f6e61, 0x7468616e,
-    };
-
-    KeySchedule(key);
-    Kasumi(text);
-    for (i = 0; i < 2; i++)
-        printf("%02x", text[i]);
-    printf("\n\n");
-    Kasumid(text);
-    for (i = 0; i < 2; i++)
-        printf("%02x", text[i]);
-    printf("\n\n");
-}
