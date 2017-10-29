@@ -12,11 +12,14 @@ typedef unsigned int u32;
 void inline KeySchedule( u16 *key , int branch );
 void Kasumi( u32 *data );
 void Kasumid( u32 *data );
-static inline u32 FO( u32 in, int index );
-static inline u32 FL( u32 in, int index );
+inline u32 FO( u32 in, int index );
+inline u32 FL( u32 in, int index );
 u16 KLi1[8][4], KLi2[8][4];
 u16 KOi1[8][4], KOi2[8][4], KOi3[8][4];
 u16 KIi1[8][4], KIi2[8][4], KIi3[8][4];
+u32 pa[2], pb[2], pc[2];
+u32 pd[2], cb[2], ca[2];
+u32 cc[2], cd[2];
 
 #include <stdio.h>
 

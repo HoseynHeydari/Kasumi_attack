@@ -81,7 +81,7 @@ static u16 FI( u16 in, u16 subkey )
  * Transforms a 32-bit value. Uses <index> to identify the
  * appropriate subkeys to use.
  *---------------------------------------------------------------------*/
-static u32 FO( u32 in, int index, int branch )
+u32 FO( u32 in, int index, int branch )
 {
     u16 left, right;
     /* Split the input into two 16-bit words */
@@ -109,7 +109,7 @@ static u32 FO( u32 in, int index, int branch )
  * Transforms a 32-bit value. Uses <index> to identify the
  * appropriate subkeys to use.
  *---------------------------------------------------------------------*/
-static u32 FL( u32 in, int index, int branch )
+u32 FL( u32 in, int index, int branch )
 {
     u16 l, r, a, b;
     /* split out the left and right halves */
