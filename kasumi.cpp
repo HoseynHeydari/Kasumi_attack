@@ -1,4 +1,3 @@
-#include <time.h>
 #include "kasumi.h"
 /*--------- 16 bit rotate left ------------------------------------------*/
 #define ROL16(a,b) (u16)((a<<b)|(a>>(16-b)))
@@ -6,9 +5,9 @@
 /*static u16 KLi1[8], KLi2[8];
 static u16 KOi1[8], KOi2[8], KOi3[8];
 static u16 KIi1[8], KIi2[8], KIi3[8];*/
-extern u16 KLi1[8], KLi2[8];
-extern u16 KOi1[8], KOi2[8], KOi3[8];
-extern u16 KIi1[8], KIi2[8], KIi3[8];
+extern u16 KLi1[8][4], KLi2[8][4];
+extern u16 KOi1[8][4], KOi2[8][4], KOi3[8][4];
+extern u16 KIi1[8][4], KIi2[8][4], KIi3[8][4];
 /*---------------------------------------------------------------------
  * FI()
  * The FI function (fig 3). It includes the S7 and S9 tables.
@@ -82,21 +81,21 @@ static u16 FI( u16 in, u16 subkey )
  * Transforms a 32-bit value. Uses <index> to identify the
  * appropriate subkeys to use.
  *---------------------------------------------------------------------*/
-static u32 FO( u32 in, int index )
+static u32 FO( u32 in, int index, int branch )
 {
     u16 left, right;
     /* Split the input into two 16-bit words */
     left = (u16)(in>>16);
     right = (u16) in;
     /* Now apply the same basic transformation three times */
-    left ^= KOi1[index];
-    left = FI( left, KIi1[index] );
+    left ^= KOi1[index][branch];
+    left = FI( left, KIi1[index][branch] );
     left ^= right;
-    right ^= KOi2[index];
-    right = FI( right, KIi2[index] );
+    right ^= KOi2[index][branch];
+    right = FI( right, KIi2[index][branch] );
     right ^= left;
-    left ^= KOi3[index];
-    left = FI( left, KIi3[index] );
+    left ^= KOi3[index][branch];
+    left = FI( left, KIi3[index][branch] );
     left ^= right;
     in = (((u32)right)<<16)+left;
 
@@ -110,16 +109,16 @@ static u32 FO( u32 in, int index )
  * Transforms a 32-bit value. Uses <index> to identify the
  * appropriate subkeys to use.
  *---------------------------------------------------------------------*/
-static u32 FL( u32 in, int index )
+static u32 FL( u32 in, int index, int branch )
 {
     u16 l, r, a, b;
     /* split out the left and right halves */
     l = (u16)(in>>16);
     r = (u16)(in);
     /* do the FL() operations */
-    a = (u16) (l & KLi1[index]);
+    a = (u16) (l & KLi1[index][branch]);
     r ^= ROL16(a,1);
-    b = (u16)(r | KLi2[index]);
+    b = (u16)(r | KLi2[index][branch]);
     l ^= ROL16(b,1);
     /* put the two halves back together */
     in = (((u32)l)<<16) + r;
@@ -209,7 +208,7 @@ void Kasumid( u32 *data )
  * Build the key schedule. Most "key" operations use 16-bit
  * subkeys so we build u16-sized arrays that are "endian" correct.
  *---------------------------------------------------------------------*/
-void KeySchedule(u16 *key )
+void KeySchedule(u16 *key, int branch )
 {
     static u16 C[] = {
             0x0123,0x4567,0x89AB,0xCDEF, 0xFEDC,0xBA98,0x7654,0x3210 };
@@ -221,13 +220,13 @@ void KeySchedule(u16 *key )
     /* Finally construct the various sub keys */
     for( n=0; n<8; ++n )
     {
-        KLi1[n] = ROL16(key[n],1);
-        KLi2[n] = Kprime[(n+2)&0x7];
-        KOi1[n] = ROL16(key[(n+1)&0x7],5);
-        KOi2[n] = ROL16(key[(n+5)&0x7],8);
-        KOi3[n] = ROL16(key[(n+6)&0x7],13);
-        KIi1[n] = Kprime[(n+4)&0x7];
-        KIi2[n] = Kprime[(n+3)&0x7];
-        KIi3[n] = Kprime[(n+7)&0x7];
+        KLi1[n][branch] = ROL16(key[n],1);
+        KLi2[n][branch] = Kprime[(n+2)&0x7];
+        KOi1[n][branch] = ROL16(key[(n+1)&0x7],5);
+        KOi2[n][branch] = ROL16(key[(n+5)&0x7],8);
+        KOi3[n][branch] = ROL16(key[(n+6)&0x7],13);
+        KIi1[n][branch] = Kprime[(n+4)&0x7];
+        KIi2[n][branch] = Kprime[(n+3)&0x7];
+        KIi3[n][branch] = Kprime[(n+7)&0x7];
     }
 }
