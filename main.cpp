@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <cmath>
-#include "kasumi.h"
 #include <unordered_map>
+#include "kasumi.h"
 
 using namespace std;
 
@@ -13,7 +13,7 @@ extern u32 cc[2], cd[2];
 
 bool Identifier(){
     bool iden;
-    iden = (ca[0] ^ FL(FO(ca[1], 7 ), 7) == cc[0] ^ FL(FO(cc[1], 7 ), 7));
+    iden = ((ca[0] ^ FL(FO(ca[1], 7 ), 7)) == (cc[0] ^ FL(FO(cc[1], 7 ), 7)));
     return iden;
 }
 
@@ -27,7 +27,7 @@ int main(void){
     u16 keya[8] = {
             0x9900, 0xAABB, 0xCCDD, 0xEEFF, 0x1122, 0x3344, 0x5566, 0x7788
     };
-    unordered_map<u16,u32*> pairs;
+    unordered_multimap<u16,u32*> pairs;
     unordered_map<u32,u32*> Quartets;
     for (int i = 0; i < 8; ++i) {
         keyb[i] = keya[i];
@@ -57,7 +57,7 @@ int main(void){
         temp1[1] = ca[1];
         temp1[2] = cb[0];
         temp1[3] = cb[1];
-        pairs[cb[1] ^ 0xFF] = temp1;
+        pairs.insert(make_pair(cb[1] ^ 0xFF,temp1));
     }
     for (int i = 0; i < sample_size; ++i) {
         pc[0] = (u32) mrand48();
@@ -69,9 +69,22 @@ int main(void){
         cd[1] = pc[1] ^ 0x00100000;
         pd[0] = cd[0];
         pd[1] = cd[1];
+        temp2[0] = ca[0];
+        temp2[1] = ca[1];
+        temp2[2] = cb[0];
+        temp2[3] = cb[1];
+        temp2[4] = cc[0];
+        temp2[5] = cc[1];
+        temp2[6] = cd[0];
+        temp2[7] = cd[1];
         Kasumi(cd);
-        if (true){
-            Quartets[ca[0] ^ cc[0]] = temp2;
+        if (pairs.find(cd[1] ^ 0xFF) != pairs.end()){
+            if ((ca[0] ^ FL(FO(ca[1], 7 ), 7)) == (cc[0] ^ FL(FO(cc[1], 7 ), 7))){
+                auto its = pairs.equal_range(cd[1] ^ 0xFF);
+                for (auto it = its.first; it != its.second; ++it) {
+                    Quartets[ca[0]^cc[0]] = temp2;
+                }
+            }
         }
     }
     return 0;
