@@ -3,6 +3,7 @@
 #include <time.h>
 #include <cmath>
 #include <unordered_map>
+#include <iostream>
 #include "kasumi.h"
 
 using namespace std;
@@ -87,5 +88,6 @@ int main(void){
             }
         }
     }
+    cout << Quartets.size();
     return 0;
 }
