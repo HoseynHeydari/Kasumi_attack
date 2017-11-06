@@ -3,5 +3,5 @@ project(Kasumi_attack)
 
 set(CMAKE_CXX_STANDARD 11)
 
-set(SOURCE_FILES main.cpp kasumi.cpp kasumi.h)
+set(SOURCE_FILES kasumi.cpp kasumi.h)
 add_executable(Kasumi_attack ${SOURCE_FILES})

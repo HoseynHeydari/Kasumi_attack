@@ -10,10 +10,10 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 
 void inline KeySchedule( u16 *key , int branch );
-void Kasumi( u32 *data );
-void Kasumid( u32 *data );
-inline u32 FO( u32 in, int index );
-inline u32 FL( u32 in, int index );
+void Kasumi( u32 *data, int branch );
+void Kasumid( u32 *data, int branch );
+static inline u32 FO( u32 in, int index , int branch );
+static inline u32 FL( u32 in, int index , int branch );
 u16 KLi1[8][4], KLi2[8][4];
 u16 KOi1[8][4], KOi2[8][4], KOi3[8][4];
 u16 KIi1[8][4], KIi2[8][4], KIi3[8][4];

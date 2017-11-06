@@ -1,4 +1,11 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <cmath>
+#include <unordered_map>
+#include <iostream>
 #include "kasumi.h"
+using namespace std;
 /*--------- 16 bit rotate left ------------------------------------------*/
 #define ROL16(a,b) (u16)((a<<b)|(a>>(16-b)))
 /*-------- globals: The subkey arrays -----------------------------------*/
@@ -8,6 +15,9 @@ static u16 KIi1[8], KIi2[8], KIi3[8];*/
 extern u16 KLi1[8][4], KLi2[8][4];
 extern u16 KOi1[8][4], KOi2[8][4], KOi3[8][4];
 extern u16 KIi1[8][4], KIi2[8][4], KIi3[8][4];
+extern u32 pa[2], pb[2], pc[2];
+extern u32 pd[2], cb[2], ca[2];
+extern u32 cc[2], cd[2];
 /*---------------------------------------------------------------------
  * FI()
  * The FI function (fig 3). It includes the S7 and S9 tables.
@@ -81,7 +91,7 @@ static u16 FI( u16 in, u16 subkey )
  * Transforms a 32-bit value. Uses <index> to identify the
  * appropriate subkeys to use.
  *---------------------------------------------------------------------*/
-u32 FO( u32 in, int index, int branch )
+static u32 FO( u32 in, int index, int branch )
 {
     u16 left, right;
     /* Split the input into two 16-bit words */
@@ -109,7 +119,7 @@ u32 FO( u32 in, int index, int branch )
  * Transforms a 32-bit value. Uses <index> to identify the
  * appropriate subkeys to use.
  *---------------------------------------------------------------------*/
-u32 FL( u32 in, int index, int branch )
+static u32 FL( u32 in, int index, int branch )
 {
     u16 l, r, a, b;
     /* split out the left and right halves */
@@ -132,7 +142,7 @@ u32 FL( u32 in, int index, int branch )
  * the Main algorithm (fig 1). Apply the same pair of operations
  * four times. Transforms the 64-bit input.
  *---------------------------------------------------------------------*/
-void Kasumi( u32 *data )
+void Kasumi( u32 *data , int branch )
 {
     u32 left, right, temp;
     //DWORD *d;
@@ -144,8 +154,8 @@ void Kasumi( u32 *data )
     right = data[1];
     //(((u32)d[1].b8[0])<<24)+(((u32)d[1].b8[1])<<16)+(d[1].b8[2]<<8)+(d[1].b8[3]);
     n = 0;
-    do{ temp = FL( left, n );
-        temp = FO( temp, n++ );
+    do{ temp = FL( left, n, branch );
+        temp = FO( temp, n++, branch );
 
         // printf("right f \t%x %x\n", right, temp);
 
@@ -153,8 +163,8 @@ void Kasumi( u32 *data )
 
         // printf("left right round\t%x %x %i\n", right, left, n);
 
-        temp = FO( right, n );
-        temp = FL( temp, n++ );
+        temp = FO( right, n, branch);
+        temp = FL( temp, n++, branch );
 
         // printf("right f \t%x %x\n", left, temp);
 
@@ -170,7 +180,7 @@ void Kasumi( u32 *data )
  * Decryption algorithm . Apply the same pair of operations
  * four times. Transforms the 64-bit input.
  *---------------------------------------------------------------------*/
-void Kasumid( u32 *data )
+void Kasumid( u32 *data, int branch )
 {
     u32 left, right, temp;
     //DWORD *d;
@@ -182,8 +192,8 @@ void Kasumid( u32 *data )
     right = data[1];
     //(((u32)d[1].b8[0])<<24)+(((u32)d[1].b8[1])<<16)+(d[1].b8[2]<<8)+(d[1].b8[3]);
     n = 7;
-    do{ temp = FO( right, n );
-        temp = FL( temp, n-- );
+    do{ temp = FO( right, n, branch );
+        temp = FL( temp, n--, branch );
 
         // printf("right f \t%x %x\n", right, temp);
 
@@ -191,8 +201,8 @@ void Kasumid( u32 *data )
 
         // printf("left right round\t%x %x %i\n", right, left, n);
 
-        temp = FL( left, n );
-        temp = FO( temp, n-- );
+        temp = FL( left, n, branch );
+        temp = FO( temp, n--, branch );
 
         // printf("right f \t%x %x\n", left, temp);
 
@@ -229,4 +239,82 @@ void KeySchedule(u16 *key, int branch )
         KIi2[n][branch] = Kprime[(n+3)&0x7];
         KIi3[n][branch] = Kprime[(n+7)&0x7];
     }
+}
+
+void attack(){
+    u32 sample_size = (u32)(pow(2, 24));
+    u32 arbitraary = 0x6a6f6e61;
+    u32 cons;
+    u32 temp[8];
+    u16 keyb[8], keyc[8], keyd[8];
+    u16 keya[8] = {
+            0x9900, 0xAABB, 0xCCDD, 0xEEFF, 0x1122, 0x3344, 0x5566, 0x7788
+    };
+    unordered_multimap<u32,u32*> pairs;
+    unordered_map<u32,u32*> Quartets;
+    for (int i = 0; i < 8; ++i) {
+        keyb[i] = keya[i];
+        keyc[i] = keya[i];
+        keyd[i] = keya[i];
+    }
+    keyb[2] = keya[2] ^ (u16) 0x8000;
+    keyc[6] = keya[6] ^ (u16) 0x8000;
+    keyd[2] = keyc[2] ^ (u16) 0x8000;
+    KeySchedule(keya, 0);
+    KeySchedule(keyb, 1);
+    KeySchedule(keyc, 2);
+    KeySchedule(keyd, 3);
+    cons = FL(FO(arbitraary, 7, 1), 7, 1) ^ FL(FO(arbitraary ^ 0x00100000, 7, 3), 7, 3);
+    srand48(time(NULL));
+    for (int i = 0; i < sample_size; ++i) {
+        pa[0] = (u32) mrand48();
+        pa[1] = arbitraary;
+        ca[0] = pa[0];
+        ca[1] = pa[1];
+        Kasumid(pa, 1);
+        cb[0] = pa[0];
+        cb[1] = pa[1] ^ 0x00100000;
+        pb[0] = cb[0];
+        pb[1] = cb[1];
+        Kasumi(cb, 2);
+        temp[0] = ca[0];
+        temp[1] = ca[1];
+        temp[2] = cb[0];
+        temp[3] = cb[1];
+        pairs.insert(make_pair( cb[1] ,temp));
+    }
+    srand48(time(NULL));
+    for (int i = 0; i < sample_size; ++i) {
+        pc[0] = (u32) mrand48();
+        pc[1] = arbitraary;
+        cc[0] = pc[0];
+        cc[1] = pc[1];
+        Kasumid(pc, 3);
+        cd[0] = pc[0];
+        cd[1] = pc[1] ^ 0x00100000;
+        pd[0] = cd[0];
+        pd[1] = cd[1];
+        Kasumi(cd, 4);
+        auto its = pairs.equal_range(cd[1] ^ 0x00100000);
+        for (auto it = its.first; it != its.second; ++it){
+            temp[0] = it->second[0];  // ca[0]
+            temp[1] = it->second[1];  // ca[1]
+            temp[2] = it->second[2];  // cb[0]
+            temp[3] = it->second[3];  // cb[1]
+            if (temp[0] ^ cc[0] == cons){
+                temp[4] = cc[0];
+                temp[5] = cc[1];
+                temp[6] = cd[0];
+                temp[7] = cd[1];
+                Quartets.insert(make_pair(temp[0] ^ temp[4], temp));
+            }
+        }
+    }
+    cout << pairs.size();
+    cout << "\n";
+    cout << Quartets.size();
+}
+
+int main(){
+    attack();
 }
