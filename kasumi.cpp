@@ -4,20 +4,32 @@
 #include <cmath>
 #include <unordered_map>
 #include <iostream>
-#include "kasumi.h"
 using namespace std;
 /*--------- 16 bit rotate left ------------------------------------------*/
 #define ROL16(a,b) (u16)((a<<b)|(a>>(16-b)))
 /*-------- globals: The subkey arrays -----------------------------------*/
+typedef unsigned short u16;
+//typedef unsigned long u32;
+typedef unsigned int u32;
+
+u16 KLi1[8][4], KLi2[8][4];
+u16 KOi1[8][4], KOi2[8][4], KOi3[8][4];
+u16 KIi1[8][4], KIi2[8][4], KIi3[8][4];
+u32 pa[2], pb[2], pc[2];
+u32 pd[2], cb[2], ca[2];
+u32 cc[2], cd[2];
 /*static u16 KLi1[8], KLi2[8];
 static u16 KOi1[8], KOi2[8], KOi3[8];
 static u16 KIi1[8], KIi2[8], KIi3[8];*/
-extern u16 KLi1[8][4], KLi2[8][4];
-extern u16 KOi1[8][4], KOi2[8][4], KOi3[8][4];
-extern u16 KIi1[8][4], KIi2[8][4], KIi3[8][4];
-extern u32 pa[2], pb[2], pc[2];
-extern u32 pd[2], cb[2], ca[2];
-extern u32 cc[2], cd[2];
+u32 sample_size = (u32)(pow(2, 24));
+u32 arbitrary = 0x6a6f6e61;
+u32 cons;
+u16 keyb[8], keyc[8], keyd[8];
+u16 keya[8] = {
+        0x9900, 0xAABB, 0xCCDD, 0xEEFF, 0x1122, 0x3344, 0x5566, 0x7788
+};
+unordered_multimap<u32,u32*> pairs;
+unordered_map<u32,u32*> Quartets;
 /*---------------------------------------------------------------------
  * FI()
  * The FI function (fig 3). It includes the S7 and S9 tables.
@@ -240,18 +252,16 @@ void KeySchedule(u16 *key, int branch )
         KIi3[n][branch] = Kprime[(n+7)&0x7];
     }
 }
-
-void attack(){
-    u32 sample_size = (u32)(pow(2, 24));
-    u32 arbitraary = 0x6a6f6e61;
-    u32 cons;
+/*---------------------------------------------------------------------
+ * Prepairing()
+ * Data Collection Phase.
+ * Identifying the Right Quartets.
+ * In the first step, the (2^24)^2 = 2^48 possible quartets are filtered according to a condition
+ * on the 32 difference bits which are known (due to the output difference δ of the distinguisher), which leaves
+ * about 2^16 quartets with the required differences.
+ *---------------------------------------------------------------------*/
+void Prepairing(){
     u32 temp[8];
-    u16 keyb[8], keyc[8], keyd[8];
-    u16 keya[8] = {
-            0x9900, 0xAABB, 0xCCDD, 0xEEFF, 0x1122, 0x3344, 0x5566, 0x7788
-    };
-    unordered_multimap<u32,u32*> pairs;
-    unordered_map<u32,u32*> Quartets;
     for (int i = 0; i < 8; ++i) {
         keyb[i] = keya[i];
         keyc[i] = keya[i];
@@ -264,11 +274,11 @@ void attack(){
     KeySchedule(keyb, 1);
     KeySchedule(keyc, 2);
     KeySchedule(keyd, 3);
-    cons = FL(FO(arbitraary, 7, 1), 7, 1) ^ FL(FO(arbitraary ^ 0x00100000, 7, 3), 7, 3);
+    cons = FL(FO(arbitrary, 7, 1), 7, 1) ^ FL(FO(arbitrary ^ 0x00100000, 7, 3), 7, 3);
     srand48(time(NULL));
     for (int i = 0; i < sample_size; ++i) {
         pa[0] = (u32) mrand48();
-        pa[1] = arbitraary;
+        pa[1] = arbitrary;
         ca[0] = pa[0];
         ca[1] = pa[1];
         Kasumid(pa, 1);
@@ -286,7 +296,7 @@ void attack(){
     srand48(time(NULL));
     for (int i = 0; i < sample_size; ++i) {
         pc[0] = (u32) mrand48();
-        pc[1] = arbitraary;
+        pc[1] = arbitrary;
         cc[0] = pc[0];
         cc[1] = pc[1];
         Kasumid(pc, 3);
@@ -314,7 +324,20 @@ void attack(){
     cout << "\n";
     cout << Quartets.size();
 }
-
+/*---------------------------------------------------------------------
+ * KeyRecovery()
+ * Analyzing Right Quartets
+ * Finding the Right Key
+ * todo define function works.
+ *---------------------------------------------------------------------*/
+void KeyRecovery(){
+    // todo implement step 3.
+}
+/*---------------------------------------------------------------------
+ * Start the attack
+ *---------------------------------------------------------------------*/
 int main(){
-    attack();
+    Prepairing();
+    KeyRecovery();
+    return 0;
 }
