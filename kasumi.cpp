@@ -243,6 +243,7 @@ void Prepairing(){
     const auto sample_size = static_cast<const long> (pow(2, 24));
     unordered_multimap<u32,u32*> pairs;
     unordered_multimap<u32,u32*> Quartets;
+    unordered_multimap<u32,int> result;
     /* Prepare subkeys*/
     for (int i = 0; i < 8; ++i) {
         keyb[i] = keya[i];
@@ -307,9 +308,25 @@ void Prepairing(){
             }
         }
     }
-    cout << pairs.size();
-    cout << "\n";
-    cout << Quartets.size();
+    int j = 0;
+    int iter = 0;
+    for (auto it = Quartets.begin(); it != Quartets.end(); ++it){
+        if ((j > 0) & (iter != it->first)){
+            j = 0;
+        }
+        if ((j == 0) & (Quartets.count(it->first) > 2)){
+            result.insert(make_pair(it->first, Quartets.count(it->first)));
+        }
+    }
+    for (auto &it : result) {
+        auto its = Quartets.equal_range(it.first);
+        for (auto iterate = its.first; iterate != its.second; ++iterate ){
+            cout << iterate->first << '\t' << iterate->second << endl;
+        }
+    }
+    cout << pairs.size() << endl;
+    cout << Quartets.size() << endl;
+    cout << result.size() << endl;
 }
 /*---------------------------------------------------------------------
  * KeyRecovery()
