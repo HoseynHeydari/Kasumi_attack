@@ -1,35 +1,26 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
+#include <cstdio>
+#include <cstdlib>
 #include <cmath>
 #include <unordered_map>
 #include <iostream>
 using namespace std;
 /*--------- 16 bit rotate left ------------------------------------------*/
-#define ROL16(a,b) (u16)((a<<b)|(a>>(16-b)))
-/*-------- globals: The subkey arrays -----------------------------------*/
+#define ROL16(a, b) (u16)(((a)<<(b))|((a)>>(16-(b))))
+/*---- globals: The subkey structure. 16 & 32 bit type definition  ------*/
 typedef unsigned short u16;
-//typedef unsigned long u32;
 typedef unsigned int u32;
 
-u16 KLi1[8][4], KLi2[8][4];
-u16 KOi1[8][4], KOi2[8][4], KOi3[8][4];
-u16 KIi1[8][4], KIi2[8][4], KIi3[8][4];
-u32 pa[2], pb[2], pc[2];
-u32 pd[2], cb[2], ca[2];
-u32 cc[2], cd[2];
-/*static u16 KLi1[8], KLi2[8];
-static u16 KOi1[8], KOi2[8], KOi3[8];
-static u16 KIi1[8], KIi2[8], KIi3[8];*/
-u32 sample_size = (u32)(pow(2, 24));
-u32 arbitrary = 0x6a6f6e61;
-u32 cons;
-u16 keyb[8], keyc[8], keyd[8];
-u16 keya[8] = {
-        0x9900, 0xAABB, 0xCCDD, 0xEEFF, 0x1122, 0x3344, 0x5566, 0x7788
+struct SKeys{
+    u16 KLi1[8];
+    u16 KLi2[8];
+    u16 KOi1[8];
+    u16 KOi2[8];
+    u16 KOi3[8];
+    u16 KIi1[8];
+    u16 KIi2[8];
+    u16 KIi3[8];
 };
-unordered_multimap<u32,u32*> pairs;
-unordered_map<u32,u32*> Quartets;
+
 /*---------------------------------------------------------------------
  * FI()
  * The FI function (fig 3). It includes the S7 and S9 tables.
@@ -80,7 +71,7 @@ static u16 FI( u16 in, u16 subkey )
             97, 30,310,219, 94,160,129,493, 64,179,263,102,189,207,114,402,
             438,477,387,122,192, 42,381, 5,145,118,180,449,293,323,136,380,
             43, 66, 60,455,341,445,202,432, 8,237, 15,376,436,464, 59,461};
-    /* The sixteen bit input is split into two unequal halves, *
+    /* The sixteen bit input is split into two unequal halves,
      * nine bits and seven bits - as is the subkey */
     nine = (u16)(in>>7);
     seven = (u16)(in&0x7F);
@@ -93,8 +84,6 @@ static u16 FI( u16 in, u16 subkey )
     seven = (u16)(S7[seven] ^ (nine & 0x7F));
     in = (u16)((seven<<9) + nine);
 
-    // printf("FI %x\n", in);
-
     return( in );
 }
 /*---------------------------------------------------------------------
@@ -103,25 +92,23 @@ static u16 FI( u16 in, u16 subkey )
  * Transforms a 32-bit value. Uses <index> to identify the
  * appropriate subkeys to use.
  *---------------------------------------------------------------------*/
-static u32 FO( u32 in, int index, int branch )
+static u32 FO( u32 in, int index, SKeys subkey )
 {
     u16 left, right;
     /* Split the input into two 16-bit words */
     left = (u16)(in>>16);
     right = (u16) in;
     /* Now apply the same basic transformation three times */
-    left ^= KOi1[index][branch];
-    left = FI( left, KIi1[index][branch] );
+    left ^= subkey.KOi1[index];
+    left = FI( left, subkey.KIi1[index] );
     left ^= right;
-    right ^= KOi2[index][branch];
-    right = FI( right, KIi2[index][branch] );
+    right ^= subkey.KOi2[index];
+    right = FI( right, subkey.KIi2[index] );
     right ^= left;
-    left ^= KOi3[index][branch];
-    left = FI( left, KIi3[index][branch] );
+    left ^= subkey.KOi3[index];
+    left = FI( left, subkey.KIi3[index] );
     left ^= right;
     in = (((u32)right)<<16)+left;
-
-    // printf("FO %x\n", in);
 
     return( in );
 }
@@ -131,21 +118,20 @@ static u32 FO( u32 in, int index, int branch )
  * Transforms a 32-bit value. Uses <index> to identify the
  * appropriate subkeys to use.
  *---------------------------------------------------------------------*/
-static u32 FL( u32 in, int index, int branch )
+static u32 FL( u32 in, int index, SKeys subkey )
 {
     u16 l, r, a, b;
     /* split out the left and right halves */
     l = (u16)(in>>16);
     r = (u16)(in);
     /* do the FL() operations */
-    a = (u16) (l & KLi1[index][branch]);
+    a = (u16) (l & subkey.KLi1[index]);
     r ^= ROL16(a,1);
-    b = (u16)(r | KLi2[index][branch]);
+    b = (u16)(r | subkey.KLi2[index]);
     l ^= ROL16(b,1);
     /* put the two halves back together */
     in = (((u32)l)<<16) + r;
 
-    // printf("FL %x\n", in);
 
     return( in );
 }
@@ -154,35 +140,20 @@ static u32 FL( u32 in, int index, int branch )
  * the Main algorithm (fig 1). Apply the same pair of operations
  * four times. Transforms the 64-bit input.
  *---------------------------------------------------------------------*/
-void Kasumi( u32 *data , int branch )
+void Kasumi( u32 *data , SKeys SKeys )
 {
     u32 left, right, temp;
-    //DWORD *d;
     int n;
     /* Start by getting the data into two 32-bit words (endian corect) */
-    //d = (DWORD*)data;
     left = data[0];
-    //(((u32)d[0].b8[0])<<24)+(((u32)d[0].b8[1])<<16)+(d[0].b8[2]<<8)+(d[0].b8[3]);
     right = data[1];
-    //(((u32)d[1].b8[0])<<24)+(((u32)d[1].b8[1])<<16)+(d[1].b8[2]<<8)+(d[1].b8[3]);
     n = 0;
-    do{ temp = FL( left, n, branch );
-        temp = FO( temp, n++, branch );
-
-        // printf("right f \t%x %x\n", right, temp);
-
+    do{ temp = FL( left, n, SKeys );
+        temp = FO( temp, n++, SKeys );
         right ^= temp;
-
-        // printf("left right round\t%x %x %i\n", right, left, n);
-
-        temp = FO( right, n, branch);
-        temp = FL( temp, n++, branch );
-
-        // printf("right f \t%x %x\n", left, temp);
-
+        temp = FO( right, n, SKeys );
+        temp = FL( temp, n++, SKeys );
         left ^= temp;
-
-        // printf("left right round\t%x %x %i\n", left, right, n);
     }while( n<=7 );
     data[0]=left;
     data[1]=right;
@@ -192,35 +163,21 @@ void Kasumi( u32 *data , int branch )
  * Decryption algorithm . Apply the same pair of operations
  * four times. Transforms the 64-bit input.
  *---------------------------------------------------------------------*/
-void Kasumid( u32 *data, int branch )
+void Kasumid( u32 *data, SKeys SKeys )
 {
     u32 left, right, temp;
     //DWORD *d;
     int n;
     /* Start by getting the data into two 32-bit words (endian corect) */
-    //d = (DWORD*)data;
     left = data[0];
-    //(((u32)d[0].b8[0])<<24)+(((u32)d[0].b8[1])<<16)+(d[0].b8[2]<<8)+(d[0].b8[3]);
     right = data[1];
-    //(((u32)d[1].b8[0])<<24)+(((u32)d[1].b8[1])<<16)+(d[1].b8[2]<<8)+(d[1].b8[3]);
     n = 7;
-    do{ temp = FO( right, n, branch );
-        temp = FL( temp, n--, branch );
-
-        // printf("right f \t%x %x\n", right, temp);
-
+    do{ temp = FO( right, n, SKeys );
+        temp = FL( temp, n--, SKeys );
         left ^= temp;
-
-        // printf("left right round\t%x %x %i\n", right, left, n);
-
-        temp = FL( left, n, branch );
-        temp = FO( temp, n--, branch );
-
-        // printf("right f \t%x %x\n", left, temp);
-
+        temp = FL( left, n, SKeys );
+        temp = FO( temp, n--, SKeys );
         right ^= temp;
-
-        // printf("left right round\t%x %x %i\n", left, right, n);
     }while( n>=0 );
     data[0]=left;
     data[1]=right;
@@ -230,11 +187,11 @@ void Kasumid( u32 *data, int branch )
  * Build the key schedule. Most "key" operations use 16-bit
  * subkeys so we build u16-sized arrays that are "endian" correct.
  *---------------------------------------------------------------------*/
-void KeySchedule(u16 *key, int branch )
-{
+SKeys KeySchedule(const u16 *key) {
     static u16 C[] = {
             0x0123,0x4567,0x89AB,0xCDEF, 0xFEDC,0xBA98,0x7654,0x3210 };
     u16 Kprime[8];
+    SKeys K = SKeys();
     int n;
     /* Now build the K'[] keys */
     for( n=0; n<8; ++n )
@@ -242,26 +199,51 @@ void KeySchedule(u16 *key, int branch )
     /* Finally construct the various sub keys */
     for( n=0; n<8; ++n )
     {
-        KLi1[n][branch] = ROL16(key[n],1);
-        KLi2[n][branch] = Kprime[(n+2)&0x7];
-        KOi1[n][branch] = ROL16(key[(n+1)&0x7],5);
-        KOi2[n][branch] = ROL16(key[(n+5)&0x7],8);
-        KOi3[n][branch] = ROL16(key[(n+6)&0x7],13);
-        KIi1[n][branch] = Kprime[(n+4)&0x7];
-        KIi2[n][branch] = Kprime[(n+3)&0x7];
-        KIi3[n][branch] = Kprime[(n+7)&0x7];
+        K.KLi1[n] = ROL16(key[n],1);
+        K.KLi2[n] = Kprime[(n+2)&0x7];
+        K.KOi1[n] = ROL16(key[(n+1)&0x7],5);
+        K.KOi2[n] = ROL16(key[(n+5)&0x7],8);
+        K.KOi3[n] = ROL16(key[(n+6)&0x7],13);
+        K.KIi1[n] = Kprime[(n+4)&0x7];
+        K.KIi2[n] = Kprime[(n+3)&0x7];
+        K.KIi3[n] = Kprime[(n+7)&0x7];
     }
+    return K;
 }
+
 /*---------------------------------------------------------------------
  * Prepairing()
  * Data Collection Phase.
  * Identifying the Right Quartets.
- * In the first step, the (2^24)^2 = 2^48 possible quartets are filtered according to a condition
- * on the 32 difference bits which are known (due to the output difference δ of the distinguisher), which leaves
+ * In the first step, the (2^24)^2 = 2^48 possible quartets are filtered
+ * according to a condition on the 32 difference bits which are known
+ * (due to the output difference δ of the distinguisher), which leaves
  * about 2^16 quartets with the required differences.
  *---------------------------------------------------------------------*/
 void Prepairing(){
-    u32 temp[8];
+    /* Boomerang attack parameters*/
+    u32 pa[2];
+    u32 pb[2];
+    u32 pc[2];
+    u32 pd[2];
+    u32 cb[2];
+    u32 ca[2];
+    u32 cc[2];
+    u32 cd[2];
+    const u32 alpha = 0x00100000;
+    const u32 gamma = 0x00100000;
+    const u32 delta = 0x00100000;
+    u16 keyb[8];
+    u16 keyc[8];
+    u16 keyd[8];
+    u16 keya[8] = {
+            0x9900, 0xAABB, 0xCCDD, 0xEEFF, 0x1122, 0x3344, 0x5566, 0x7788
+    };
+    /* Attack requierd sample numbers*/
+    const auto sample_size = static_cast<const long> (pow(2, 24));
+    unordered_multimap<u32,u32*> pairs;
+    unordered_multimap<u32,u32*> Quartets;
+    /* Prepare subkeys*/
     for (int i = 0; i < 8; ++i) {
         keyb[i] = keya[i];
         keyc[i] = keya[i];
@@ -270,48 +252,53 @@ void Prepairing(){
     keyb[2] = keya[2] ^ (u16) 0x8000;
     keyc[6] = keya[6] ^ (u16) 0x8000;
     keyd[2] = keyc[2] ^ (u16) 0x8000;
-    KeySchedule(keya, 0);
-    KeySchedule(keyb, 1);
-    KeySchedule(keyc, 2);
-    KeySchedule(keyd, 3);
-    cons = FL(FO(arbitrary, 7, 1), 7, 1) ^ FL(FO(arbitrary ^ 0x00100000, 7, 3), 7, 3);
-    srand48(time(NULL));
+    SKeys Ka = KeySchedule(keya);
+    SKeys Kb = KeySchedule(keya);
+    SKeys Kc = KeySchedule(keya);
+    SKeys Kd = KeySchedule(keya);
+    /* Arbitrary number in algorithm */
+    const u32 arbitrary = 0x6a6f6e61;
+    /* Number that distinguish right quarters */
+    u32 cons = FL(FO(arbitrary, 7, Ka), 7, Ka) ^ FL(FO(arbitrary ^ 0x00100000, 7, Kc), 7, Kc);
+    u32 temp[8];
+    /* Create first hash table*/
+    srand48(time(nullptr));
     for (int i = 0; i < sample_size; ++i) {
         pa[0] = (u32) mrand48();
         pa[1] = arbitrary;
         ca[0] = pa[0];
         ca[1] = pa[1];
-        Kasumid(pa, 1);
+        Kasumid(pa, Ka);
         cb[0] = pa[0];
-        cb[1] = pa[1] ^ 0x00100000;
+        cb[1] = pa[1] ^ alpha;
         pb[0] = cb[0];
         pb[1] = cb[1];
-        Kasumi(cb, 2);
+        Kasumi(cb, Kb);
         temp[0] = ca[0];
         temp[1] = ca[1];
         temp[2] = cb[0];
         temp[3] = cb[1];
         pairs.insert(make_pair( cb[1] ,temp));
     }
-    srand48(time(NULL));
+    /* Create hash table of candidate quarters */
     for (int i = 0; i < sample_size; ++i) {
         pc[0] = (u32) mrand48();
-        pc[1] = arbitrary;
+        pc[1] = arbitrary ^ gamma;
         cc[0] = pc[0];
         cc[1] = pc[1];
-        Kasumid(pc, 3);
+        Kasumid(pc, Kc);
         cd[0] = pc[0];
-        cd[1] = pc[1] ^ 0x00100000;
+        cd[1] = pc[1] ^ alpha;
         pd[0] = cd[0];
         pd[1] = cd[1];
-        Kasumi(cd, 4);
-        auto its = pairs.equal_range(cd[1] ^ 0x00100000);
+        Kasumi(cd, Kd);
+        auto its = pairs.equal_range(cd[1] ^ delta);
         for (auto it = its.first; it != its.second; ++it){
-            temp[0] = it->second[0];  // ca[0]
-            temp[1] = it->second[1];  // ca[1]
-            temp[2] = it->second[2];  // cb[0]
-            temp[3] = it->second[3];  // cb[1]
-            if (temp[0] ^ cc[0] == cons){
+            if ((it->second[0]) ^ cc[0] == cons){
+                temp[0] = it->second[0];  // ca[0]
+                temp[1] = it->second[1];  // ca[1]
+                temp[2] = it->second[2];  // cb[0]
+                temp[3] = it->second[3];  // cb[1]
                 temp[4] = cc[0];
                 temp[5] = cc[1];
                 temp[6] = cd[0];
